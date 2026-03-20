@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ID-RSS — Intelligent Document Retrieval & Structuring System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════
+   TOKENS & RESET
+═══════════════════════════════════════════════════ */
+:root {
+  --bg:          #F7F5F0;
+  --bg2:         #EEEAE2;
+  --surface:     #FFFFFF;
+  --surface2:    #F2EFE9;
+  --border:      #E0D9CE;
+  --border2:     #CCC5B8;
+  --ink:         #1C1917;
+  --ink2:        #44403C;
+  --ink3:        #78716C;
+  --accent:      #0D7C5F;
+  --accent2:     #0A6B51;
+  --accent-glow: rgba(13,124,95,0.18);
+  --teal-light:  #E6F4EF;
+  --gold:        #C9922A;
+  --gold-light:  #FEF3DC;
+  --red:         #C0392B;
+  --red-light:   #FDEDEB;
+  --radius:      12px;
+  --radius2:     8px;
+  --shadow:      0 4px 24px rgba(28,25,23,0.08);
+  --shadow2:     0 2px 8px  rgba(28,25,23,0.06);
+  --transition:  0.35s cubic-bezier(0.4,0,0.2,1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ═══════════════════════════════════════════════════
+   CINEMATIC INTRO — full-screen overlay
+═══════════════════════════════════════════════════ */
+#intro {
+  position: fixed; inset: 0;
+  background: #0D1117;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+/* subtle grid lines */
+#intro::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(13,124,95,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(13,124,95,0.07) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridSlide 8s linear infinite;
+}
+@keyframes gridSlide { to { background-position: 60px 60px; } }
+
+/* scanner line */
+#intro::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(13,124,95,0.6), transparent);
+  animation: scan 3s ease-in-out infinite;
+  top: 0;
+}
+@keyframes scan {
+  0%   { top: 0%;   opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.intro-logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(3rem, 8vw, 6rem);
+  color: #FAFAF8;
+  letter-spacing: -0.02em;
+  opacity: 0;
+  transform: translateY(30px);
+  animation: riseIn 1s cubic-bezier(0.4,0,0.2,1) 0.4s forwards;
+  position: relative;
+  z-index: 2;
+}
+
+.intro-logo span {
+  color: #0D7C5F;
+  display: inline-block;
+  animation: pulse-color 2s ease-in-out 1.4s infinite alternate;
+}
+@keyframes pulse-color {
+  from { color: #0D7C5F; text-shadow: 0 0 20px rgba(13,124,95,0); }
+  to   { color: #14A37F; text-shadow: 0 0 30px rgba(13,124,95,0.4); }
+}
+
+.intro-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.7rem, 2vw, 0.9rem);
+  color: rgba(250,250,248,0.5);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin-top: 16px;
+  opacity: 0;
+  animation: riseIn 1s cubic-bezier(0.4,0,0.2,1) 0.8s forwards;
+  position: relative; z-index: 2;
+}
+
+.intro-tagline {
+  font-size: clamp(0.8rem, 2vw, 1rem);
+  color: rgba(250,250,248,0.35);
+  margin-top: 8px;
+  opacity: 0;
+  animation: riseIn 1s cubic-bezier(0.4,0,0.2,1) 1.1s forwards;
+  position: relative; z-index: 2;
+}
+
+.intro-bar-wrap {
+  margin-top: 48px;
+  width: min(320px, 80vw);
+  position: relative; z-index: 2;
+  opacity: 0;
+  animation: riseIn 0.8s ease 1.4s forwards;
+}
+
+.intro-bar-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: rgba(250,250,248,0.4);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  display: flex; justify-content: space-between;
+}
+
+.intro-bar-track {
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.intro-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0D7C5F, #14A37F);
+  border-radius: 99px;
+  width: 0%;
+  animation: loadBar 2s cubic-bezier(0.4,0,0.2,1) 1.6s forwards;
+  box-shadow: 0 0 12px rgba(13,124,95,0.6);
+}
+@keyframes loadBar { to { width: 100%; } }
+
+.intro-dots {
+  display: flex; gap: 8px; margin-top: 20px; justify-content: center;
+  position: relative; z-index: 2;
+  opacity: 0;
+  animation: fadeIn 0.5s ease 1.6s forwards;
+}
+.intro-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(13,124,95,0.3);
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+.intro-dot:nth-child(2) { animation-delay: 0.2s; }
+.intro-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotPulse {
+  0%, 100% { background: rgba(13,124,95,0.3); transform: scale(1); }
+  50%       { background: #0D7C5F; transform: scale(1.4); }
+}
+
+.intro-badge {
+  position: absolute;
+  bottom: 32px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.2);
+  letter-spacing: 0.15em;
+  z-index: 2;
+  opacity: 0;
+  animation: fadeIn 1s ease 2s forwards;
+}
+
+/* fade out entire intro */
+#intro.exit {
+  animation: exitIntro 0.9s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+@keyframes exitIntro {
+  0%   { opacity: 1; transform: scale(1); }
+  60%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1.06); pointer-events: none; }
+}
+
+/* ═══════════════════════════════════════════════════
+   MAIN APP — hidden until intro ends
+═══════════════════════════════════════════════════ */
+#app {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+  min-height: 100vh;
+}
+#app.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════════
+   TOPBAR
+═══════════════════════════════════════════════════ */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(247,245,240,0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+  animation: slideDown 0.7s cubic-bezier(0.4,0,0.2,1) 0.2s both;
+}
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.topbar-brand {
+  display: flex; align-items: center; gap: 12px;
+}
+
+.topbar-icon {
+  width: 34px; height: 34px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 16px;
+  box-shadow: 0 2px 12px var(--accent-glow);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.topbar-icon:hover { transform: rotate(6deg) scale(1.08); box-shadow: 0 4px 20px var(--accent-glow); }
+
+.topbar-name {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.15rem;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.topbar-name span { color: var(--accent); }
+
+.topbar-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 99px;
+}
+
+/* ═══════════════════════════════════════════════════
+   HERO SECTION
+═══════════════════════════════════════════════════ */
+.hero {
+  padding: 64px 32px 40px;
+  max-width: 860px;
+  margin: 0 auto;
+  animation: riseIn 0.9s ease 0.3s both;
+}
+
+.hero-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 24px; height: 2px;
+  background: var(--accent);
+  border-radius: 99px;
+}
+
+.hero-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+.hero-title em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.hero-desc {
+  font-size: 1rem;
+  color: var(--ink3);
+  line-height: 1.65;
+  max-width: 520px;
+}
+
+.hero-pills {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 24px;
+}
+.pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1px solid var(--border2);
+  color: var(--ink2);
+  background: var(--surface);
+  transition: all var(--transition);
+}
+.pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--teal-light);
+  transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════════
+   MAIN LAYOUT
+═══════════════════════════════════════════════════ */
+.main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 32px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ═══════════════════════════════════════════════════
+   CARD
+═══════════════════════════════════════════════════ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  box-shadow: var(--shadow2);
+  transition: box-shadow var(--transition);
+  animation: riseIn 0.6s ease both;
+}
+.card:hover { box-shadow: var(--shadow); }
+
+.card-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 22px;
+}
+.card-step {
+  width: 28px; height: 28px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  flex-shrink: 0;
+  transition: background var(--transition), transform var(--transition);
+}
+.card.active .card-step, .card-step.done {
+  background: var(--accent);
+  transform: scale(1.1);
+}
+.card-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+/* ═══════════════════════════════════════════════════
+   FORM ELEMENTS
+═══════════════════════════════════════════════════ */
+label.field-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink2);
+  margin-bottom: 8px;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+  appearance: none;
+}
+input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-glow);
+  background: #FEFEFE;
+}
+input[type="text"]::placeholder { color: var(--ink3); font-size: 0.82rem; }
+
+/* ═══════════════════════════════════════════════════
+   FIELD CHIPS
+═══════════════════════════════════════════════════ */
+.fields-input-row {
+  display: flex; gap: 10px;
+  margin-bottom: 14px;
+}
+.fields-input-row input { flex: 1; }
+
+.btn-add-field {
+  padding: 12px 18px;
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius2);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+  flex-shrink: 0;
+}
+.btn-add-field:hover {
+  background: #0D0C0B;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(28,25,23,0.2);
+}
+.btn-add-field:active { transform: translateY(0); }
+
+.chips {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  min-height: 36px;
+  padding: 4px 0;
+}
+
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px 6px 14px;
+  background: var(--teal-light);
+  border: 1.5px solid rgba(13,124,95,0.22);
+  border-radius: 99px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--accent2);
+  font-weight: 500;
+  animation: chipIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+  transition: all var(--transition);
+}
+.chip:hover {
+  background: #D0EDE6;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+@keyframes chipIn {
+  from { transform: scale(0.7) translateY(4px); opacity: 0; }
+  to   { transform: scale(1) translateY(0);    opacity: 1; }
+}
+
+.chip-remove {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: rgba(13,124,95,0.2);
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  color: var(--accent2);
+  transition: background var(--transition), transform var(--transition);
+  line-height: 1;
+}
+.chip-remove:hover {
+  background: var(--accent);
+  color: white;
+  transform: rotate(90deg) scale(1.1);
+}
+
+.chip-empty {
+  font-size: 0.78rem;
+  color: var(--ink3);
+  font-style: italic;
+  padding: 6px 0;
+}
+
+/* ═══════════════════════════════════════════════════
+   PRIMARY BUTTON
+═══════════════════════════════════════════════════ */
+.btn-primary {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%;
+  padding: 15px 28px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius2);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  position: relative;
+  overflow: hidden;
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+  margin-top: 8px;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent);
+  transition: opacity var(--transition);
+}
+.btn-primary:hover {
+  background: var(--accent2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(13,124,95,0.35);
+}
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* shimmer on hover */
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -75%;
+  width: 50%; height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+}
+.btn-primary:hover::after { left: 125%; }
+
+/* ═══════════════════════════════════════════════════
+   PROGRESS / SPINNER
+═══════════════════════════════════════════════════ */
+.progress-wrap {
+  display: none;
+  padding: 20px 0 4px;
+}
+.progress-wrap.show { display: block; }
+
+.progress-info {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  color: var(--ink3);
+}
+.progress-info strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.progress-track {
+  height: 4px;
+  background: var(--bg2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #18BF94);
+  border-radius: 99px;
+  width: 0%;
+  transition: width 0.3s ease;
+  position: relative;
+}
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 30px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5));
+  animation: shimmerProgress 1s linear infinite;
+}
+@keyframes shimmerProgress { to { right: -30px; } }
+
+.progress-log {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--ink3);
+  margin-top: 10px;
+  height: 18px;
+  overflow: hidden;
+}
+.progress-log span {
+  display: block;
+  animation: logSlide 0.3s ease both;
+}
+@keyframes logSlide {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════
+   ERROR TOAST
+═══════════════════════════════════════════════════ */
+.toast {
+  position: fixed;
+  bottom: 32px; right: 32px;
+  background: #1C0A09;
+  color: #FFDAD6;
+  padding: 14px 20px;
+  border-radius: var(--radius2);
+  font-size: 0.875rem;
+  max-width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  z-index: 9000;
+  display: none;
+  border-left: 3px solid var(--red);
+  animation: toastIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.toast.show { display: block; }
+@keyframes toastIn {
+  from { transform: translateX(120%) scale(0.9); opacity: 0; }
+  to   { transform: translateX(0) scale(1);     opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════
+   RESULTS SECTION
+═══════════════════════════════════════════════════ */
+#results-section {
+  display: none;
+  animation: riseIn 0.7s cubic-bezier(0.4,0,0.2,1) both;
+}
+#results-section.show { display: block; }
+
+/* stat cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius2);
+  padding: 18px 20px;
+  text-align: center;
+  transition: transform var(--transition), box-shadow var(--transition);
+  animation: riseIn 0.5s ease both;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.stat-card.loaded::before { transform: scaleX(1); }
+.stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.stat-card:nth-child(2)::before { background: var(--gold); }
+.stat-card:nth-child(3)::before { background: var(--red); }
+
+.stat-value {
+  font-family: 'DM Serif Display', serif;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--ink);
+  margin-bottom: 4px;
+  transition: all 0.4s ease;
+}
+.stat-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  font-weight: 500;
+}
+
+/* table wrapper */
+.table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius2);
+  overflow: hidden;
+  background: var(--surface);
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+/* custom scrollbar */
+.table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+.table-wrap::-webkit-scrollbar-track { background: var(--bg2); }
+.table-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+.table-wrap::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.87rem;
+}
+
+thead th {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 13px 16px;
+  text-align: left;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  position: sticky; top: 0;
+  z-index: 10;
+  white-space: nowrap;
+}
+thead th:first-child { width: 50px; text-align: center; }
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  opacity: 0;
+  transform: translateX(-12px);
+  transition: background var(--transition);
+}
+tbody tr.row-visible {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.4s ease, transform 0.4s ease, background var(--transition);
+}
+tbody tr:hover { background: var(--teal-light) !important; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:nth-child(even) { background: var(--surface2); }
+
+td {
+  padding: 12px 16px;
+  color: var(--ink2);
+  font-family: 'DM Sans', sans-serif;
+  vertical-align: middle;
+}
+td:first-child {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--ink3);
+}
+
+td.file-cell {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.conf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.conf-100  { background: #D1FAE5; color: #065F46; }
+.conf-part { background: var(--gold-light); color: #92400E; }
+.conf-0    { background: var(--red-light); color: #991B1B; }
+
+/* ═══════════════════════════════════════════════════
+   EXPORT BUTTONS
+═══════════════════════════════════════════════════ */
+.export-row {
+  display: flex; gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.btn-export {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 22px;
+  border-radius: var(--radius2);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all var(--transition);
+  flex: 1;
+  min-width: 160px;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.btn-export::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0);
+  transition: background 0.2s;
+}
+.btn-export:active::after { background: rgba(255,255,255,0.12); }
+
+.btn-excel {
+  background: #1A7B4B;
+  color: white;
+  box-shadow: 0 2px 12px rgba(26,123,75,0.25);
+}
+.btn-excel:hover {
+  background: #155E39;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(26,123,75,0.35);
+}
+
+.btn-sheets {
+  background: var(--surface);
+  color: var(--ink2);
+  border: 1.5px solid var(--border);
+}
+.btn-sheets:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--teal-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+/* ═══════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════ */
+footer {
+  text-align: center;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--ink3);
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.04em;
+  margin-top: 16px;
+}
+footer span { color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════ */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0 16px;
+}
+
+/* stagger cards */
+.main .card:nth-child(1) { animation-delay: 0.15s; }
+.main .card:nth-child(2) { animation-delay: 0.25s; }
+
+/* search highlight */
+.dash-val {
+  color: var(--ink3);
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════ */
+@media (max-width: 620px) {
+  .topbar { padding: 0 16px; }
+  .hero   { padding: 40px 16px 24px; }
+  .main   { padding: 0 16px 48px; }
+  .card   { padding: 20px 18px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stats-grid .stat-card:nth-child(1) { grid-column: span 2; }
+  .export-row { flex-direction: column; }
+  .btn-export { min-width: unset; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═════════════════════════════════════════════
+     CINEMATIC INTRO
+═════════════════════════════════════════════ -->
+<div id="intro">
+  <div class="intro-logo">ID<span>-RSS</span></div>
+  <div class="intro-sub">Intelligent Document Retrieval &amp; Structuring System</div>
+  <div class="intro-tagline">HackIndia 2026 · KCC Institute · Team ARISE</div>
+
+  <div class="intro-bar-wrap">
+    <div class="intro-bar-label">
+      <span>INITIALIZING SYSTEM</span>
+      <span id="intro-pct">0%</span>
+    </div>
+    <div class="intro-bar-track">
+      <div class="intro-bar-fill" id="intro-fill"></div>
+    </div>
+    <div class="intro-dots">
+      <div class="intro-dot"></div>
+      <div class="intro-dot"></div>
+      <div class="intro-dot"></div>
+    </div>
+  </div>
+
+  <div class="intro-badge">PYTHON · FLASK · OPENPYXL · REGEX</div>
+</div>
+
+<!-- ═════════════════════════════════════════════
+     MAIN APP
+═════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- TOPBAR -->
+  <nav class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-icon">📄</div>
+      <span class="topbar-name">ID<span>-RSS</span></span>
+    </div>
+    <span class="topbar-badge">v1.0.0 · HackIndia 2026</span>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-eyebrow">Document Intelligence</div>
+    <h1 class="hero-title">Extract. Structure.<br><em>Export.</em></h1>
+    <p class="hero-desc">
+      Point to a folder of <code style="font-family:'JetBrains Mono',monospace;font-size:0.9em;background:var(--surface2);padding:1px 6px;border-radius:4px;">.docx</code> files,
+      name the fields you need, and watch the data materialize — row by row — then export with one click.
+    </p>
+    <div class="hero-pills">
+      <span class="pill">python-docx</span>
+      <span class="pill">openpyxl</span>
+      <span class="pill">Flask</span>
+      <span class="pill">regex</span>
+      <span class="pill">30 demo files</span>
+    </div>
+  </section>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- CARD 1: Folder path -->
+    <div class="card" id="card-folder">
+      <div class="card-header">
+        <div class="card-step" id="step1">1</div>
+        <h2 class="card-title">Choose Document Folder</h2>
+      </div>
+      <label class="field-label" for="folderPath">Folder path</label>
+      <input type="text" id="folderPath"
+             placeholder="demo_files  or  C:\full\path\to\folder"
+             value="demo_files"
+             autocomplete="off">
+      <p style="font-size:0.78rem;color:var(--ink3);margin-top:8px;">
+        Type <code style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:3px;">demo_files</code> for the included 30-file demo set.
+      </p>
+    </div>
+
+    <!-- CARD 2: Fields -->
+    <div class="card" id="card-fields">
+      <div class="card-header">
+        <div class="card-step" id="step2">2</div>
+        <h2 class="card-title">Add Fields to Extract</h2>
+      </div>
+      <div class="fields-input-row">
+        <input type="text" id="fieldInput"
+               placeholder="e.g.  Name  or  Serial No."
+               autocomplete="off">
+        <button class="btn-add-field" onclick="addField()">+ Add</button>
+      </div>
+      <div class="chips" id="chips">
+        <!-- default chips pre-loaded -->
+      </div>
+      <p style="font-size:0.78rem;color:var(--ink3);margin-top:10px;">
+        Labels in your .docx must follow the pattern: <code style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:3px;">Label- Value</code>
+      </p>
+    </div>
+
+    <!-- Extract button + progress -->
+    <div class="card" style="padding:24px 32px;">
+      <button class="btn-primary" id="extractBtn" onclick="startExtract()">
+        <span id="btn-icon">⚡</span>
+        <span id="btn-text">Extract Data from All Files</span>
+      </button>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-info">
+          <span id="progress-label">Processing…</span>
+          <strong id="progress-count">0 / 0</strong>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-log" id="progressLog"></div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="results-section">
+
+      <!-- Stat cards -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card" id="sc-total">
+          <div class="stat-value" id="sv-total">—</div>
+          <div class="stat-label">Total Files</div>
+        </div>
+        <div class="stat-card" id="sc-full">
+          <div class="stat-value" id="sv-full">—</div>
+          <div class="stat-label">Fully Extracted</div>
+        </div>
+        <div class="stat-card" id="sc-partial">
+          <div class="stat-value" id="sv-partial">—</div>
+          <div class="stat-label">Partial / Failed</div>
+        </div>
+      </div>
+
+      <!-- Table card -->
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:20px 24px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="card-step done">✓</div>
+            <h2 class="card-title" style="margin:0;">Extraction Results</h2>
+          </div>
+          <span id="result-count" style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--ink3);"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr id="thead-row"></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <div style="padding:20px 24px;">
+          <div class="export-row">
+            <button class="btn-export btn-excel" onclick="downloadExcel()">
+              <span>📊</span> Download Excel
+            </button>
+            <button class="btn-export btn-sheets" onclick="openSheets()">
+              <span>📋</span> Open Google Sheets
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- /results-section -->
+
+  </main>
+
+  <footer>
+    Built with ❤️ by <span>Team ARISE</span> &nbsp;·&nbsp; HackIndia 2026 &nbsp;·&nbsp; KCC Institute
+  </footer>
+</div>
+
+<!-- ERROR TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ═════════════════════════════════════════════
+     JAVASCRIPT
+═════════════════════════════════════════════ -->
+<script>
+/* ── STATE ─────────────────────────────────── */
+let fields        = ["Name", "Serial No."];
+let extractedData = [];
+let extractedFields = [];
+
+/* ── INTRO ANIMATION ───────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+
+  // Animate percentage counter
+  const pctEl  = document.getElementById('intro-pct');
+  const fillEl = document.getElementById('intro-fill');
+  let pct = 0;
+  const ticker = setInterval(() => {
+    pct = Math.min(100, pct + Math.random() * 8 + 2);
+    pctEl.textContent = Math.floor(pct) + '%';
+    if (pct >= 100) clearInterval(ticker);
+  }, 120);
+
+  // After 3.4s dismiss intro, show app
+  setTimeout(() => {
+    document.getElementById('intro').classList.add('exit');
+    setTimeout(() => {
+      document.getElementById('intro').style.display = 'none';
+      const app = document.getElementById('app');
+      app.classList.add('visible');
+    }, 900);
+  }, 3400);
+
+  // Render default chips
+  renderChips();
+
+  // Enter key in field input
+  document.getElementById('fieldInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addField(); }
+  });
+});
+
+/* ── CHIPS ─────────────────────────────────── */
+function renderChips() {
+  const wrap = document.getElementById('chips');
+  if (fields.length === 0) {
+    wrap.innerHTML = '<span class="chip-empty">No fields yet — add one above</span>';
+    return;
+  }
+  wrap.innerHTML = fields.map((f, i) => `
+    <span class="chip">
+      ${escapeHtml(f)}
+      <button class="chip-remove" onclick="removeField(${i})" title="Remove">✕</button>
+    </span>
+  `).join('');
+}
+
+function addField() {
+  const input = document.getElementById('fieldInput');
+  const val   = input.value.trim();
+  if (!val) { flashInput(input); return; }
+  if (fields.includes(val)) { showToast('Field "' + val + '" already added'); return; }
+  fields.push(val);
+  renderChips();
+  input.value = '';
+  input.focus();
+  markStep(2, true);
+}
+
+function removeField(i) {
+  fields.splice(i, 1);
+  renderChips();
+}
+
+function flashInput(el) {
+  el.style.borderColor = 'var(--red)';
+  el.style.boxShadow   = '0 0 0 4px rgba(192,57,43,0.15)';
+  setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 1000);
+}
+
+/* ── EXTRACT ───────────────────────────────── */
+async function startExtract() {
+  const folderPath = document.getElementById('folderPath').value.trim();
+
+  if (!folderPath)       { showToast('Please enter a folder path'); return; }
+  if (fields.length === 0) { showToast('Add at least one field to extract'); return; }
+
+  extractedFields = [...fields];
+  const btn  = document.getElementById('extractBtn');
+  btn.disabled = true;
+  document.getElementById('btn-text').textContent = 'Extracting…';
+  document.getElementById('btn-icon').textContent = '⏳';
+
+  const pwrap = document.getElementById('progressWrap');
+  pwrap.classList.add('show');
+  setProgress(0, 0, 0);
+
+  document.getElementById('results-section').classList.remove('show');
+
+  try {
+    const res = await fetch('/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder_path: folderPath, fields: extractedFields })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Extraction failed');
+    }
+
+    const data = await res.json();
+    if (!data.length) { throw new Error('No .docx files found in that folder'); }
+
+    extractedData = data;
+    await animateResults(data, extractedFields);
+
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+    document.getElementById('btn-text').textContent = 'Extract Data from All Files';
+    document.getElementById('btn-icon').textContent = '⚡';
+  }
+}
+
+/* ── ANIMATE RESULTS ROW BY ROW ──────────── */
+async function animateResults(data, fields) {
+  const section = document.getElementById('results-section');
+  section.classList.add('show');
+
+  // Build header
+  const thead = document.getElementById('thead-row');
+  thead.innerHTML = '<th>#</th><th>File</th>'
+    + fields.map(f => `<th>${escapeHtml(f)}</th>`).join('')
+    + '<th>Confidence</th>';
+
+  // Clear tbody
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+
+  let full = 0, partial = 0, failed = 0;
+  const total = data.length;
+
+  for (let i = 0; i < data.length; i++) {
+    const row  = data[i];
+    const conf = parseFloat(row.confidence || 0);
+
+    if (conf === 1.0) full++;
+    else if (conf > 0) partial++;
+    else failed++;
+
+    // Progress update
+    setProgress(i + 1, total, ((i+1)/total)*100);
+    logProgress(row.file);
+
+    // Build row
+    const tr = document.createElement('tr');
+    const confClass = conf === 1.0 ? 'conf-100' : conf > 0 ? 'conf-part' : 'conf-0';
+    const confIcon  = conf === 1.0 ? '●' : conf > 0 ? '◑' : '○';
+
+    tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td class="file-cell">${escapeHtml(row.file)}</td>
+      ${fields.map(f => {
+        const v = row[f] || '—';
+        return `<td${v === '—' ? ' class="dash-val"' : ''}>${escapeHtml(v)}</td>`;
+      }).join('')}
+      <td><span class="conf-badge ${confClass}">${confIcon} ${Math.round(conf * 100)}%</span></td>
+    `;
+    tbody.appendChild(tr);
+
+    // Stagger reveal
+    await delay(30);
+    tr.classList.add('row-visible');
+
+    // Update stat cards live
+    document.getElementById('sv-total').textContent   = i + 1;
+    document.getElementById('sv-full').textContent    = full;
+    document.getElementById('sv-partial').textContent = partial + failed;
+  }
+
+  // Trigger stat card bar animations
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.add('loaded'));
+  document.getElementById('result-count').textContent = `${total} records`;
+
+  // Done
+  setProgress(total, total, 100);
+  logProgress('Extraction complete ✓');
+}
+
+/* ── PROGRESS HELPERS ─────────────────────── */
+function setProgress(current, total, pct) {
+  document.getElementById('progressFill').style.width  = pct + '%';
+  document.getElementById('progress-count').textContent = `${current} / ${total}`;
+  document.getElementById('progress-label').textContent =
+    pct < 100 ? 'Processing files…' : 'Done ✓';
+}
+
+function logProgress(msg) {
+  const el = document.getElementById('progressLog');
+  el.innerHTML = `<span>${escapeHtml(msg)}</span>`;
+}
+
+/* ── EXPORT ───────────────────────────────── */
+async function downloadExcel() {
+  if (!extractedData.length) { showToast('Nothing to export yet'); return; }
+  try {
+    const res = await fetch('/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: extractedData, fields: extractedFields })
+    });
+    if (!res.ok) throw new Error('Export failed');
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'extracted_data.xlsx';
+    document.body.appendChild(a); a.click();
+    URL.revokeObjectURL(url); a.remove();
+  } catch (err) { showToast('Export failed: ' + err.message); }
+}
+
+function openSheets() {
+  if (!extractedData.length) { showToast('Extract data first'); return; }
+  downloadExcel();
+  setTimeout(() => window.open('https://sheets.new', '_blank'), 800);
+}
+
+/* ── TOAST ────────────────────────────────── */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = '⚠ ' + msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+/* ── STEP MARKERS ─────────────────────────── */
+function markStep(n, done) {
+  const el = document.getElementById('step' + n);
+  if (el) el.classList.toggle('done', done);
+}
+
+/* ── UTILS ────────────────────────────────── */
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+
+</body>
+</html>
