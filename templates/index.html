@@ -4,1155 +4,1226 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ID-RSS — Intelligent Document Retrieval & Structuring System</title>
+<meta name="description" content="Extract structured data from .docx files instantly in your browser. HackIndia 2026 · Team ARISE · KCC Institute">
+<meta property="og:title" content="ID-RSS — Document Intelligence">
+<meta property="og:description" content="Drop .docx files, name your fields, watch data appear. Export to Excel in one click.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Browser-side .docx parser -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- Browser-side Excel writer -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
-/* ═══════════════════════════════════════════════════
-   TOKENS & RESET
-═══════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════════════════════ */
 :root {
-  --bg:          #F7F5F0;
-  --bg2:         #EEEAE2;
-  --surface:     #FFFFFF;
-  --surface2:    #F2EFE9;
-  --border:      #E0D9CE;
-  --border2:     #CCC5B8;
-  --ink:         #1C1917;
-  --ink2:        #44403C;
-  --ink3:        #78716C;
-  --accent:      #0D7C5F;
-  --accent2:     #0A6B51;
-  --accent-glow: rgba(13,124,95,0.18);
-  --teal-light:  #E6F4EF;
-  --gold:        #C9922A;
-  --gold-light:  #FEF3DC;
-  --red:         #C0392B;
-  --red-light:   #FDEDEB;
-  --radius:      12px;
-  --radius2:     8px;
-  --shadow:      0 4px 24px rgba(28,25,23,0.08);
-  --shadow2:     0 2px 8px  rgba(28,25,23,0.06);
-  --transition:  0.35s cubic-bezier(0.4,0,0.2,1);
+  --bg:           #F9F7F2;
+  --bg2:          #F0ECE3;
+  --surface:      #FFFFFF;
+  --surface2:     #F5F2EC;
+  --border:       #E3DDD3;
+  --border2:      #CEC7BB;
+  --ink:          #1A1714;
+  --ink2:         #433E3A;
+  --ink3:         #7A7268;
+  --ink4:         #A8A099;
+  --accent:       #1A6B52;
+  --accent2:      #155842;
+  --accent3:      #0F4432;
+  --glow:         rgba(26,107,82,0.15);
+  --glow2:        rgba(26,107,82,0.08);
+  --mint:         #E8F5EF;
+  --mint2:        #D1EDE0;
+  --gold:         #B8860B;
+  --gold-bg:      #FEF7E6;
+  --rose:         #C0392B;
+  --rose-bg:      #FDECEA;
+  --r:            14px;
+  --r2:           9px;
+  --r3:           6px;
+  --sh:           0 2px 12px rgba(26,23,20,0.07), 0 1px 3px rgba(26,23,20,0.04);
+  --sh2:          0 8px 32px rgba(26,23,20,0.10), 0 2px 8px rgba(26,23,20,0.06);
+  --sh3:          0 20px 60px rgba(26,23,20,0.14);
+  --ease:         cubic-bezier(0.4, 0, 0.2, 1);
+  --spring:       cubic-bezier(0.34, 1.56, 0.64, 1);
+  --t:            0.32s;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; font-size: 16px; }
 
 body {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Outfit', sans-serif;
   background: var(--bg);
   color: var(--ink);
   min-height: 100vh;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ═══════════════════════════════════════════════════
-   CINEMATIC INTRO — full-screen overlay
-═══════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   CINEMATIC INTRO
+══════════════════════════════════════════════ */
 #intro {
-  position: fixed; inset: 0;
-  background: #0D1117;
+  position: fixed; inset: 0; z-index: 9999;
+  background: #0C1018;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  z-index: 9999;
   overflow: hidden;
+  cursor: none;
 }
 
-/* subtle grid lines */
-#intro::before {
-  content: '';
+/* animated dot grid */
+.intro-grid {
   position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(13,124,95,0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(13,124,95,0.07) 1px, transparent 1px);
-  background-size: 60px 60px;
-  animation: gridSlide 8s linear infinite;
+  background-image: radial-gradient(circle, rgba(26,107,82,0.25) 1px, transparent 1px);
+  background-size: 44px 44px;
+  animation: gridDrift 20s linear infinite;
+  opacity: 0;
+  animation: gridAppear 1s ease 0.3s forwards, gridDrift 20s linear 1.3s infinite;
 }
-@keyframes gridSlide { to { background-position: 60px 60px; } }
+@keyframes gridAppear { to { opacity: 1; } }
+@keyframes gridDrift  { to { background-position: 44px 44px; } }
 
-/* scanner line */
-#intro::after {
-  content: '';
+/* radial gradient spotlight */
+.intro-spotlight {
   position: absolute;
-  left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(13,124,95,0.6), transparent);
-  animation: scan 3s ease-in-out infinite;
-  top: 0;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(26,107,82,0.12) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: spotlightPulse 4s ease-in-out infinite;
 }
-@keyframes scan {
+@keyframes spotlightPulse {
+  0%,100% { transform: scale(1);   opacity: 0.6; }
+  50%      { transform: scale(1.3); opacity: 1;   }
+}
+
+/* scan line */
+.intro-scan {
+  position: absolute; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(26,107,82,0.8) 50%, transparent 100%);
+  top: -1px;
+  animation: scanDown 2.5s ease-in-out 0.6s infinite;
+}
+@keyframes scanDown {
   0%   { top: 0%;   opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
   100% { top: 100%; opacity: 0; }
 }
 
-.intro-logo {
-  font-family: 'DM Serif Display', serif;
-  font-size: clamp(3rem, 8vw, 6rem);
-  color: #FAFAF8;
-  letter-spacing: -0.02em;
-  opacity: 0;
-  transform: translateY(30px);
-  animation: riseIn 1s cubic-bezier(0.4,0,0.2,1) 0.4s forwards;
-  position: relative;
-  z-index: 2;
-}
-
-.intro-logo span {
-  color: #0D7C5F;
-  display: inline-block;
-  animation: pulse-color 2s ease-in-out 1.4s infinite alternate;
-}
-@keyframes pulse-color {
-  from { color: #0D7C5F; text-shadow: 0 0 20px rgba(13,124,95,0); }
-  to   { color: #14A37F; text-shadow: 0 0 30px rgba(13,124,95,0.4); }
-}
-
-.intro-sub {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: clamp(0.7rem, 2vw, 0.9rem);
-  color: rgba(250,250,248,0.5);
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  margin-top: 16px;
-  opacity: 0;
-  animation: riseIn 1s cubic-bezier(0.4,0,0.2,1) 0.8s forwards;
+.intro-content {
   position: relative; z-index: 2;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+}
+
+.intro-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(26,107,82,0.8);
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.5s forwards;
+}
+
+.intro-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(4rem, 12vw, 7.5rem);
+  font-weight: 700;
+  color: #F5F2EC;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  opacity: 0;
+  animation: logoReveal 1.2s var(--ease) 0.7s forwards;
+  position: relative;
+}
+.intro-logo .dash { color: #1A6B52; }
+.intro-logo .rss  {
+  font-style: italic;
+  font-weight: 400;
+  color: rgba(245,242,236,0.65);
+}
+
+@keyframes logoReveal {
+  0%   { opacity: 0; transform: translateY(40px) scale(0.94); filter: blur(12px); }
+  60%  { filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0)  scale(1);    filter: blur(0); }
 }
 
 .intro-tagline {
-  font-size: clamp(0.8rem, 2vw, 1rem);
-  color: rgba(250,250,248,0.35);
-  margin-top: 8px;
+  font-size: clamp(0.78rem, 2vw, 0.92rem);
+  color: rgba(245,242,236,0.4);
+  margin-top: 18px;
+  letter-spacing: 0.04em;
   opacity: 0;
-  animation: riseIn 1s cubic-bezier(0.4,0,0.2,1) 1.1s forwards;
-  position: relative; z-index: 2;
+  animation: fadeUp 0.8s var(--ease) 1.1s forwards;
 }
 
-.intro-bar-wrap {
-  margin-top: 48px;
-  width: min(320px, 80vw);
-  position: relative; z-index: 2;
+/* loading bar */
+.intro-loader {
+  margin-top: 52px;
+  width: min(340px, 80vw);
   opacity: 0;
-  animation: riseIn 0.8s ease 1.4s forwards;
+  animation: fadeUp 0.6s var(--ease) 1.5s forwards;
 }
-
-.intro-bar-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  color: rgba(250,250,248,0.4);
-  letter-spacing: 0.1em;
-  margin-bottom: 8px;
+.intro-loader-meta {
   display: flex; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  color: rgba(245,242,236,0.3);
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
 }
-
-.intro-bar-track {
-  height: 3px;
-  background: rgba(255,255,255,0.08);
+.intro-track {
+  height: 2px;
+  background: rgba(255,255,255,0.07);
   border-radius: 99px;
   overflow: hidden;
+  position: relative;
 }
-
-.intro-bar-fill {
+.intro-fill {
   height: 100%;
-  background: linear-gradient(90deg, #0D7C5F, #14A37F);
+  background: linear-gradient(90deg, #1A6B52, #2ECC99);
   border-radius: 99px;
   width: 0%;
-  animation: loadBar 2s cubic-bezier(0.4,0,0.2,1) 1.6s forwards;
-  box-shadow: 0 0 12px rgba(13,124,95,0.6);
+  box-shadow: 0 0 16px rgba(26,107,82,0.7);
+  animation: barFill 2.2s var(--ease) 1.7s forwards;
 }
-@keyframes loadBar { to { width: 100%; } }
+@keyframes barFill { to { width: 100%; } }
 
-.intro-dots {
-  display: flex; gap: 8px; margin-top: 20px; justify-content: center;
-  position: relative; z-index: 2;
-  opacity: 0;
-  animation: fadeIn 0.5s ease 1.6s forwards;
+.intro-steps {
+  display: flex; gap: 6px; margin-top: 18px; justify-content: center;
 }
-.intro-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: rgba(13,124,95,0.3);
-  animation: dotPulse 1.2s ease-in-out infinite;
+.intro-step-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(26,107,82,0.25);
+  animation: stepPulse 1.4s ease-in-out infinite;
 }
-.intro-dot:nth-child(2) { animation-delay: 0.2s; }
-.intro-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes dotPulse {
-  0%, 100% { background: rgba(13,124,95,0.3); transform: scale(1); }
-  50%       { background: #0D7C5F; transform: scale(1.4); }
+.intro-step-dot:nth-child(2) { animation-delay: 0.18s; }
+.intro-step-dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes stepPulse {
+  0%,100% { background: rgba(26,107,82,0.25); transform: scale(1); }
+  50%      { background: #1A6B52; transform: scale(1.5); }
 }
 
-.intro-badge {
-  position: absolute;
-  bottom: 32px;
+.intro-footer {
+  position: absolute; bottom: 28px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
-  color: rgba(255,255,255,0.2);
-  letter-spacing: 0.15em;
-  z-index: 2;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  color: rgba(255,255,255,0.15);
   opacity: 0;
-  animation: fadeIn 1s ease 2s forwards;
+  animation: fadeIn 1s ease 2.2s forwards;
 }
 
-/* fade out entire intro */
 #intro.exit {
-  animation: exitIntro 0.9s cubic-bezier(0.4,0,0.2,1) forwards;
+  animation: introExit 1s var(--ease) forwards;
 }
-@keyframes exitIntro {
-  0%   { opacity: 1; transform: scale(1); }
-  60%  { opacity: 1; transform: scale(1.04); }
-  100% { opacity: 0; transform: scale(1.06); pointer-events: none; }
+@keyframes introExit {
+  0%   { opacity: 1; transform: scale(1);    filter: blur(0); }
+  100% { opacity: 0; transform: scale(1.05); filter: blur(8px); pointer-events: none; }
 }
 
-/* ═══════════════════════════════════════════════════
-   MAIN APP — hidden until intro ends
-═══════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   APP SHELL
+══════════════════════════════════════════════ */
 #app {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.8s ease, transform 0.8s ease;
-  min-height: 100vh;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
 }
-#app.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
+#app.visible { opacity: 1; transform: translateY(0); }
 
-/* ═══════════════════════════════════════════════════
-   TOPBAR
-═══════════════════════════════════════════════════ */
-.topbar {
-  position: sticky; top: 0; z-index: 100;
-  background: rgba(247,245,240,0.85);
-  backdrop-filter: blur(16px);
+/* ══════════════════════════════════════════════
+   NAV
+══════════════════════════════════════════════ */
+.nav {
+  position: sticky; top: 0; z-index: 200;
+  height: 58px;
+  background: rgba(249,247,242,0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--border);
-  padding: 0 32px;
-  height: 60px;
   display: flex; align-items: center; justify-content: space-between;
-  animation: slideDown 0.7s cubic-bezier(0.4,0,0.2,1) 0.2s both;
-}
-@keyframes slideDown {
-  from { transform: translateY(-100%); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
+  padding: 0 clamp(16px, 4vw, 40px);
 }
 
-.topbar-brand {
-  display: flex; align-items: center; gap: 12px;
+.nav-brand {
+  display: flex; align-items: center; gap: 11px;
+  text-decoration: none;
 }
-
-.topbar-icon {
-  width: 34px; height: 34px;
+.nav-gem {
+  width: 32px; height: 32px;
   background: var(--accent);
-  border-radius: 8px;
+  border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
-  color: white; font-size: 16px;
-  box-shadow: 0 2px 12px var(--accent-glow);
-  transition: transform var(--transition), box-shadow var(--transition);
+  font-size: 15px;
+  box-shadow: 0 3px 14px var(--glow);
+  transition: transform var(--t) var(--spring), box-shadow var(--t);
+  flex-shrink: 0;
 }
-.topbar-icon:hover { transform: rotate(6deg) scale(1.08); box-shadow: 0 4px 20px var(--accent-glow); }
+.nav-gem:hover { transform: rotate(8deg) scale(1.1); box-shadow: 0 6px 20px var(--glow); }
 
-.topbar-name {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.15rem;
+.nav-wordmark {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.01em;
 }
-.topbar-name span { color: var(--accent); }
+.nav-wordmark em { font-style: italic; font-weight: 400; color: var(--accent); }
 
-.topbar-badge {
+.nav-right { display: flex; align-items: center; gap: 10px; }
+
+.nav-chip {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.12em;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink3);
+  padding: 4px 10px;
   background: var(--surface2);
   border: 1px solid var(--border);
-  padding: 4px 10px;
   border-radius: 99px;
-}
-
-/* ═══════════════════════════════════════════════════
-   HERO SECTION
-═══════════════════════════════════════════════════ */
-.hero {
-  padding: 64px 32px 40px;
-  max-width: 860px;
-  margin: 0 auto;
-  animation: riseIn 0.9s ease 0.3s both;
-}
-
-.hero-eyebrow {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: 12px;
-  display: flex; align-items: center; gap: 8px;
-}
-.hero-eyebrow::before {
-  content: '';
-  display: inline-block;
-  width: 24px; height: 2px;
-  background: var(--accent);
-  border-radius: 99px;
-}
-
-.hero-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: clamp(2rem, 5vw, 3.2rem);
-  line-height: 1.15;
-  letter-spacing: -0.025em;
-  color: var(--ink);
-  margin-bottom: 16px;
-}
-.hero-title em {
-  font-style: italic;
-  color: var(--accent);
-}
-
-.hero-desc {
-  font-size: 1rem;
   color: var(--ink3);
-  line-height: 1.65;
-  max-width: 520px;
 }
 
-.hero-pills {
-  display: flex; flex-wrap: wrap; gap: 8px;
-  margin-top: 24px;
+.nav-github {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  background: var(--ink);
+  color: #F5F2EC;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background var(--t), transform var(--t) var(--spring);
 }
-.pill {
+.nav-github:hover { background: #2D2925; transform: translateY(-1px); }
+
+/* ══════════════════════════════════════════════
+   HERO
+══════════════════════════════════════════════ */
+.hero {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: clamp(40px,6vw,80px) clamp(16px,4vw,40px) clamp(24px,4vw,48px);
+}
+
+.hero-kicker {
+  display: inline-flex; align-items: center; gap: 8px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  padding: 5px 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeUp 0.7s var(--ease) 0.2s forwards;
+}
+.hero-kicker::before {
+  content: '';
+  width: 20px; height: 2px;
+  background: var(--accent);
   border-radius: 99px;
-  border: 1px solid var(--border2);
+  display: inline-block;
+}
+
+.hero-h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.2rem, 5.5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.028em;
+  color: var(--ink);
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.35s forwards;
+}
+.hero-h1 .italic { font-style: italic; font-weight: 400; color: var(--accent); }
+
+.hero-p {
+  font-size: 1.05rem;
+  color: var(--ink3);
+  line-height: 1.7;
+  max-width: 560px;
+  margin-bottom: 28px;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.5s forwards;
+}
+
+.hero-tags {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  opacity: 0;
+  animation: fadeUp 0.7s var(--ease) 0.65s forwards;
+}
+.htag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  padding: 5px 13px;
+  border-radius: 99px;
+  border: 1.5px solid var(--border2);
   color: var(--ink2);
   background: var(--surface);
-  transition: all var(--transition);
+  transition: all var(--t) var(--ease);
+  cursor: default;
 }
-.pill:hover {
+.htag:hover {
   border-color: var(--accent);
   color: var(--accent);
-  background: var(--teal-light);
-  transform: translateY(-1px);
+  background: var(--mint);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--glow);
 }
 
-/* ═══════════════════════════════════════════════════
-   MAIN LAYOUT
-═══════════════════════════════════════════════════ */
-.main {
-  max-width: 860px;
+/* ══════════════════════════════════════════════
+   NOTICE BANNER (GitHub Pages mode)
+══════════════════════════════════════════════ */
+.mode-banner {
+  max-width: 900px; margin: 0 auto;
+  padding: 0 clamp(16px,4vw,40px) 20px;
+  opacity: 0;
+  animation: fadeUp 0.6s var(--ease) 0.75s forwards;
+}
+.mode-banner-inner {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 18px;
+  background: var(--mint);
+  border: 1.5px solid var(--mint2);
+  border-radius: var(--r2);
+  font-size: 0.84rem;
+  color: var(--accent3);
+  line-height: 1.55;
+}
+.mode-banner-inner span:first-child { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+.mode-banner strong { font-weight: 600; }
+
+/* ══════════════════════════════════════════════
+   MAIN CONTENT
+══════════════════════════════════════════════ */
+.workspace {
+  max-width: 900px;
   margin: 0 auto;
-  padding: 0 32px 80px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  padding: 0 clamp(16px,4vw,40px) 80px;
+  display: flex; flex-direction: column; gap: 20px;
 }
 
-/* ═══════════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    CARD
-═══════════════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 28px 32px;
-  box-shadow: var(--shadow2);
-  transition: box-shadow var(--transition);
-  animation: riseIn 0.6s ease both;
+  border-radius: var(--r);
+  box-shadow: var(--sh);
+  overflow: hidden;
+  transition: box-shadow var(--t);
+  opacity: 0;
+  animation: fadeUp 0.6s var(--ease) both;
 }
-.card:hover { box-shadow: var(--shadow); }
+.card:hover { box-shadow: var(--sh2); }
 
-.card-header {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 22px;
+.card-head {
+  display: flex; align-items: center; gap: 13px;
+  padding: 22px 28px 16px;
+  border-bottom: 1px solid var(--border);
 }
-.card-step {
-  width: 28px; height: 28px;
+.step-num {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: 50%;
   background: var(--ink);
   color: var(--bg);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
-  font-weight: 500;
-  flex-shrink: 0;
-  transition: background var(--transition), transform var(--transition);
+  font-size: 0.76rem; font-weight: 500;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--t), transform var(--t) var(--spring);
 }
-.card.active .card-step, .card-step.done {
-  background: var(--accent);
-  transform: scale(1.1);
-}
+.step-num.done { background: var(--accent); transform: scale(1.1); }
+.step-num.done::after { content: '✓'; }
+
 .card-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.1rem;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.08rem;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
+.card-body { padding: 22px 28px; }
 
-/* ═══════════════════════════════════════════════════
-   FORM ELEMENTS
-═══════════════════════════════════════════════════ */
-label.field-label {
+/* ══════════════════════════════════════════════
+   FORM
+══════════════════════════════════════════════ */
+.flabel {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink2);
-  margin-bottom: 8px;
+  margin-bottom: 9px;
 }
 
 input[type="text"] {
-  width: 100%;
-  padding: 12px 16px;
+  width: 100%; padding: 12px 16px;
   border: 1.5px solid var(--border);
-  border-radius: var(--radius2);
+  border-radius: var(--r2);
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.875rem;
   color: var(--ink);
   background: var(--surface);
   outline: none;
-  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
-  appearance: none;
+  transition: border-color var(--t), box-shadow var(--t), background var(--t);
 }
 input[type="text"]:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-glow);
+  box-shadow: 0 0 0 4px var(--glow);
   background: #FEFEFE;
 }
-input[type="text"]::placeholder { color: var(--ink3); font-size: 0.82rem; }
+input[type="text"]::placeholder { color: var(--ink4); font-size: 0.82rem; }
 
-/* ═══════════════════════════════════════════════════
-   FIELD CHIPS
-═══════════════════════════════════════════════════ */
-.fields-input-row {
-  display: flex; gap: 10px;
-  margin-bottom: 14px;
-}
-.fields-input-row input { flex: 1; }
-
-.btn-add-field {
-  padding: 12px 18px;
-  background: var(--ink);
-  color: var(--bg);
-  border: none;
-  border-radius: var(--radius2);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.85rem;
-  font-weight: 500;
+/* ══════════════════════════════════════════════
+   DROP ZONE
+══════════════════════════════════════════════ */
+.dropzone {
+  border: 2px dashed var(--border2);
+  border-radius: var(--r);
+  padding: 40px 24px;
+  text-align: center;
+  background: var(--surface2);
   cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
-  flex-shrink: 0;
+  transition: all var(--t);
+  position: relative;
 }
-.btn-add-field:hover {
-  background: #0D0C0B;
+.dropzone:hover, .dropzone.drag-over {
+  border-color: var(--accent);
+  background: var(--mint);
+  box-shadow: 0 0 0 6px var(--glow2);
+}
+.dropzone input[type="file"] {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer;
+  width: 100%; height: 100%;
+  padding: 0; border: none;
+  font-size: 0;
+}
+.drop-icon { font-size: 2.4rem; margin-bottom: 10px; line-height: 1; }
+.drop-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem; font-weight: 600;
+  color: var(--ink2);
+  margin-bottom: 6px;
+}
+.drop-sub  { font-size: 0.82rem; color: var(--ink3); line-height: 1.5; }
+.drop-sub code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg2); padding: 1px 6px;
+  border-radius: 4px; font-size: 0.78rem;
+}
+
+.file-list {
+  margin-top: 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.file-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  color: var(--ink2);
+  animation: chipIn 0.3s var(--spring) both;
+}
+.file-item .fi-icon { color: var(--accent); font-size: 1rem; }
+.file-item .fi-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-item .fi-size { color: var(--ink4); flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════
+   CHIPS (field tags)
+══════════════════════════════════════════════ */
+.field-add-row {
+  display: flex; gap: 10px; margin-bottom: 14px;
+}
+.field-add-row input { flex: 1; }
+
+.btn-add {
+  padding: 12px 18px;
+  background: var(--ink); color: var(--bg);
+  border: none; border-radius: var(--r2);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background var(--t), transform var(--t) var(--spring), box-shadow var(--t);
+}
+.btn-add:hover {
+  background: #2D2925;
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(28,25,23,0.2);
+  box-shadow: 0 4px 16px rgba(26,23,20,0.22);
 }
-.btn-add-field:active { transform: translateY(0); }
 
-.chips {
+.chips-wrap {
   display: flex; flex-wrap: wrap; gap: 8px;
-  min-height: 36px;
-  padding: 4px 0;
+  min-height: 38px; padding: 3px 0;
 }
-
 .chip {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 12px 6px 14px;
-  background: var(--teal-light);
-  border: 1.5px solid rgba(13,124,95,0.22);
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 13px 6px 14px;
+  background: var(--mint);
+  border: 1.5px solid rgba(26,107,82,0.2);
   border-radius: 99px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem;
+  font-size: 0.76rem; font-weight: 500;
   color: var(--accent2);
-  font-weight: 500;
-  animation: chipIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
-  transition: all var(--transition);
+  animation: chipIn 0.35s var(--spring) both;
+  transition: all var(--t);
 }
 .chip:hover {
-  background: #D0EDE6;
   border-color: var(--accent);
+  background: var(--mint2);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px var(--accent-glow);
+  box-shadow: 0 3px 10px var(--glow);
 }
 @keyframes chipIn {
-  from { transform: scale(0.7) translateY(4px); opacity: 0; }
-  to   { transform: scale(1) translateY(0);    opacity: 1; }
+  from { transform: scale(0.65) translateY(6px); opacity: 0; }
+  to   { transform: scale(1)    translateY(0);   opacity: 1; }
 }
 
-.chip-remove {
-  width: 16px; height: 16px;
-  border-radius: 50%;
-  background: rgba(13,124,95,0.2);
-  border: none;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px;
+.chip-x {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: none; cursor: pointer;
+  background: rgba(26,107,82,0.18);
   color: var(--accent2);
-  transition: background var(--transition), transform var(--transition);
-  line-height: 1;
+  font-size: 9px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--t), transform var(--t) var(--spring);
 }
-.chip-remove:hover {
-  background: var(--accent);
-  color: white;
-  transform: rotate(90deg) scale(1.1);
+.chip-x:hover { background: var(--accent); color: white; transform: rotate(90deg) scale(1.15); }
+
+.chips-empty {
+  font-size: 0.8rem; color: var(--ink4);
+  font-style: italic; padding: 6px 0;
 }
 
-.chip-empty {
-  font-size: 0.78rem;
-  color: var(--ink3);
-  font-style: italic;
-  padding: 6px 0;
-}
-
-/* ═══════════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    PRIMARY BUTTON
-═══════════════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 .btn-primary {
   display: flex; align-items: center; justify-content: center; gap: 10px;
-  width: 100%;
-  padding: 15px 28px;
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: var(--radius2);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  letter-spacing: 0.01em;
-  position: relative;
-  overflow: hidden;
-  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
-  margin-top: 8px;
+  width: 100%; padding: 16px;
+  background: var(--accent); color: white;
+  border: none; border-radius: var(--r2);
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem; font-weight: 600;
+  cursor: pointer; letter-spacing: 0.01em;
+  position: relative; overflow: hidden;
+  transition: background var(--t), transform var(--t) var(--spring), box-shadow var(--t);
 }
 .btn-primary::before {
   content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+}
+.btn-primary::after {
+  content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent);
-  transition: opacity var(--transition);
+  top: -60%; left: -80%; width: 50%; height: 220%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.7s var(--ease);
 }
 .btn-primary:hover {
   background: var(--accent2);
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(13,124,95,0.35);
+  box-shadow: 0 10px 30px rgba(26,107,82,0.35);
 }
+.btn-primary:hover::after { left: 130%; }
 .btn-primary:active { transform: translateY(0); }
 .btn-primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
+  opacity: 0.5; cursor: not-allowed;
+  transform: none !important; box-shadow: none !important;
 }
 
-/* shimmer on hover */
-.btn-primary::after {
-  content: '';
-  position: absolute;
-  top: -50%; left: -75%;
-  width: 50%; height: 200%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
-  transform: skewX(-20deg);
-  transition: left 0.6s ease;
-}
-.btn-primary:hover::after { left: 125%; }
+/* ══════════════════════════════════════════════
+   PROGRESS
+══════════════════════════════════════════════ */
+.prog-wrap { display: none; padding: 18px 0 4px; }
+.prog-wrap.show { display: block; }
 
-/* ═══════════════════════════════════════════════════
-   PROGRESS / SPINNER
-═══════════════════════════════════════════════════ */
-.progress-wrap {
-  display: none;
-  padding: 20px 0 4px;
-}
-.progress-wrap.show { display: block; }
-
-.progress-info {
+.prog-row {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 10px;
-  font-size: 0.82rem;
-  color: var(--ink3);
+  margin-bottom: 9px;
+  font-size: 0.82rem; color: var(--ink3);
 }
-.progress-info strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+.prog-row strong { color: var(--accent); font-variant-numeric: tabular-nums; }
 
-.progress-track {
-  height: 4px;
-  background: var(--bg2);
-  border-radius: 99px;
-  overflow: hidden;
+.prog-track {
+  height: 3px; background: var(--bg2); border-radius: 99px; overflow: hidden;
 }
-.progress-fill {
+.prog-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), #18BF94);
-  border-radius: 99px;
-  width: 0%;
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--accent), #2ECC99);
+  border-radius: 99px; width: 0%;
+  transition: width 0.25s var(--ease);
   position: relative;
 }
-.progress-fill::after {
+.prog-fill::after {
   content: '';
-  position: absolute;
-  right: 0; top: 0; bottom: 0;
-  width: 30px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5));
-  animation: shimmerProgress 1s linear infinite;
+  position: absolute; right: 0; top: 0; bottom: 0; width: 40px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6));
+  animation: shimProg 1s linear infinite;
 }
-@keyframes shimmerProgress { to { right: -30px; } }
+@keyframes shimProg { to { transform: translateX(40px); } }
 
-.progress-log {
+.prog-log {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  color: var(--ink3);
-  margin-top: 10px;
-  height: 18px;
-  overflow: hidden;
+  font-size: 0.7rem; color: var(--ink4);
+  margin-top: 8px; height: 16px; overflow: hidden;
 }
-.progress-log span {
-  display: block;
-  animation: logSlide 0.3s ease both;
+.prog-log span { display: block; animation: logPop 0.25s var(--ease) both; }
+@keyframes logPop {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
 }
-@keyframes logSlide {
-  from { transform: translateY(10px); opacity: 0; }
+
+/* ══════════════════════════════════════════════
+   STATS GRID
+══════════════════════════════════════════════ */
+.stats-row {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;
+}
+
+.stat-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 20px;
+  text-align: center;
+  position: relative; overflow: hidden;
+  transition: transform var(--t) var(--spring), box-shadow var(--t);
+  animation: fadeUp 0.5s var(--ease) both;
+}
+.stat-box::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.8s var(--ease);
+}
+.stat-box.anim::after { transform: scaleX(1); }
+.stat-box:nth-child(1)::after { background: var(--accent); }
+.stat-box:nth-child(2)::after { background: var(--gold); }
+.stat-box:nth-child(3)::after { background: var(--rose); }
+.stat-box:hover { transform: translateY(-4px); box-shadow: var(--sh2); }
+
+.stat-val {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.6rem; line-height: 1;
+  color: var(--ink); margin-bottom: 5px;
+  animation: countUp 0.6s var(--ease) both;
+}
+@keyframes countUp {
+  from { transform: translateY(12px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
-
-/* ═══════════════════════════════════════════════════
-   ERROR TOAST
-═══════════════════════════════════════════════════ */
-.toast {
-  position: fixed;
-  bottom: 32px; right: 32px;
-  background: #1C0A09;
-  color: #FFDAD6;
-  padding: 14px 20px;
-  border-radius: var(--radius2);
-  font-size: 0.875rem;
-  max-width: 340px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-  z-index: 9000;
-  display: none;
-  border-left: 3px solid var(--red);
-  animation: toastIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
-}
-.toast.show { display: block; }
-@keyframes toastIn {
-  from { transform: translateX(120%) scale(0.9); opacity: 0; }
-  to   { transform: translateX(0) scale(1);     opacity: 1; }
+.stat-lbl {
+  font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink4);
 }
 
-/* ═══════════════════════════════════════════════════
-   RESULTS SECTION
-═══════════════════════════════════════════════════ */
-#results-section {
-  display: none;
-  animation: riseIn 0.7s cubic-bezier(0.4,0,0.2,1) both;
-}
-#results-section.show { display: block; }
-
-/* stat cards */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  background: var(--surface);
+/* ══════════════════════════════════════════════
+   RESULTS TABLE
+══════════════════════════════════════════════ */
+.tbl-outer {
+  border-radius: var(--r2); overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: var(--radius2);
-  padding: 18px 20px;
-  text-align: center;
-  transition: transform var(--transition), box-shadow var(--transition);
-  animation: riseIn 0.5s ease both;
-  position: relative;
-  overflow: hidden;
+  max-height: 440px; overflow-y: auto;
 }
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.6s cubic-bezier(0.4,0,0.2,1);
-}
-.stat-card.loaded::before { transform: scaleX(1); }
-.stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
-.stat-card:nth-child(2)::before { background: var(--gold); }
-.stat-card:nth-child(3)::before { background: var(--red); }
+.tbl-outer::-webkit-scrollbar { width: 5px; }
+.tbl-outer::-webkit-scrollbar-track { background: var(--bg2); }
+.tbl-outer::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+.tbl-outer::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-.stat-value {
-  font-family: 'DM Serif Display', serif;
-  font-size: 2.4rem;
-  line-height: 1;
-  color: var(--ink);
-  margin-bottom: 4px;
-  transition: all 0.4s ease;
-}
-.stat-label {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink3);
-  font-weight: 500;
-}
-
-/* table wrapper */
-.table-wrap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius2);
-  overflow: hidden;
-  background: var(--surface);
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-/* custom scrollbar */
-.table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
-.table-wrap::-webkit-scrollbar-track { background: var(--bg2); }
-.table-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
-.table-wrap::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.87rem;
-}
+table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
 
 thead th {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--ink); color: var(--bg);
   padding: 13px 16px;
-  text-align: left;
-  font-family: 'DM Sans', sans-serif;
-  font-weight: 600;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  position: sticky; top: 0;
-  z-index: 10;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600; font-size: 0.74rem;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  text-align: left; position: sticky; top: 0; z-index: 5;
   white-space: nowrap;
 }
-thead th:first-child { width: 50px; text-align: center; }
+thead th:first-child { text-align: center; width: 48px; }
 
 tbody tr {
   border-bottom: 1px solid var(--border);
-  opacity: 0;
-  transform: translateX(-12px);
-  transition: background var(--transition);
+  opacity: 0; transform: translateX(-10px);
+  transition: background var(--t);
 }
-tbody tr.row-visible {
-  opacity: 1;
-  transform: translateX(0);
-  transition: opacity 0.4s ease, transform 0.4s ease, background var(--transition);
+tbody tr.row-in {
+  opacity: 1; transform: translateX(0);
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), background var(--t);
 }
-tbody tr:hover { background: var(--teal-light) !important; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:nth-child(even) { background: var(--surface2); }
+tbody tr:hover { background: var(--mint) !important; }
 
 td {
-  padding: 12px 16px;
+  padding: 11px 16px;
   color: var(--ink2);
-  font-family: 'DM Sans', sans-serif;
   vertical-align: middle;
 }
 td:first-child {
   text-align: center;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
-  color: var(--ink3);
+  font-size: 0.72rem; color: var(--ink4);
 }
-
-td.file-cell {
+td.td-file {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem;
+  font-size: 0.76rem; font-weight: 500;
   color: var(--ink);
-  font-weight: 500;
 }
+td.td-dash { color: var(--ink4); font-style: italic; }
 
-.conf-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 99px;
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 99px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.72rem; font-weight: 600;
   white-space: nowrap;
 }
-.conf-100  { background: #D1FAE5; color: #065F46; }
-.conf-part { background: var(--gold-light); color: #92400E; }
-.conf-0    { background: var(--red-light); color: #991B1B; }
+.badge-100  { background: #D1FAE5; color: #065F46; }
+.badge-part { background: var(--gold-bg); color: #92400E; }
+.badge-fail { background: var(--rose-bg); color: #991B1B; }
 
-/* ═══════════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    EXPORT BUTTONS
-═══════════════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 .export-row {
-  display: flex; gap: 12px;
-  margin-top: 20px;
-  flex-wrap: wrap;
+  display: flex; gap: 12px; flex-wrap: wrap;
+  padding: 20px 28px;
+  border-top: 1px solid var(--border);
 }
-
-.btn-export {
-  display: flex; align-items: center; gap: 8px;
+.btn-exp {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  flex: 1; min-width: 150px;
   padding: 12px 22px;
-  border-radius: var(--radius2);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.9rem;
-  font-weight: 600;
+  border: none; border-radius: var(--r2);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem; font-weight: 600;
   cursor: pointer;
-  border: none;
-  transition: all var(--transition);
-  flex: 1;
-  min-width: 160px;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
+  transition: all var(--t) var(--ease);
+  position: relative; overflow: hidden;
 }
-.btn-export::after {
-  content: '';
-  position: absolute;
-  inset: 0;
+.btn-exp::after {
+  content: ''; position: absolute; inset: 0;
   background: rgba(255,255,255,0);
-  transition: background 0.2s;
+  transition: background 0.15s;
 }
-.btn-export:active::after { background: rgba(255,255,255,0.12); }
+.btn-exp:active::after { background: rgba(255,255,255,0.1); }
 
 .btn-excel {
-  background: #1A7B4B;
-  color: white;
+  background: #1A7B4B; color: white;
   box-shadow: 0 2px 12px rgba(26,123,75,0.25);
 }
-.btn-excel:hover {
-  background: #155E39;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(26,123,75,0.35);
-}
+.btn-excel:hover { background: #155E39; transform: translateY(-2px); box-shadow: 0 6px 22px rgba(26,123,75,0.35); }
 
-.btn-sheets {
-  background: var(--surface);
-  color: var(--ink2);
+.btn-gsheets {
+  background: var(--surface); color: var(--ink2);
   border: 1.5px solid var(--border);
 }
-.btn-sheets:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--teal-light);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px var(--accent-glow);
+.btn-gsheets:hover {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--mint); transform: translateY(-2px);
+  box-shadow: 0 4px 16px var(--glow);
 }
 
-/* ═══════════════════════════════════════════════════
+/* ══════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════ */
+.toast {
+  position: fixed; bottom: 28px; right: 28px;
+  padding: 13px 18px;
+  background: #1A0C0B; color: #FFD9D6;
+  border-left: 3px solid var(--rose);
+  border-radius: var(--r2);
+  font-size: 0.84rem; max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  z-index: 9000; display: none;
+  animation: toastSlide 0.4s var(--spring);
+}
+.toast.show { display: block; }
+@keyframes toastSlide {
+  from { transform: translateX(110%) scale(0.92); opacity: 0; }
+  to   { transform: translateX(0)    scale(1);    opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════
    FOOTER
-═══════════════════════════════════════════════════ */
+══════════════════════════════════════════════ */
 footer {
-  text-align: center;
-  padding: 24px 32px;
+  text-align: center; padding: 28px;
   border-top: 1px solid var(--border);
-  font-size: 0.78rem;
-  color: var(--ink3);
+  font-size: 0.76rem; color: var(--ink4);
   font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 0.04em;
-  margin-top: 16px;
+  letter-spacing: 0.06em;
 }
-footer span { color: var(--accent); }
+footer a { color: var(--accent); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
 
-/* ═══════════════════════════════════════════════════
-   UTILITIES
-═══════════════════════════════════════════════════ */
-@keyframes riseIn {
-  from { opacity: 0; transform: translateY(20px); }
+/* ══════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0);    }
 }
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; } to { opacity: 1; }
 }
 
-.divider {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 4px 0 16px;
-}
+.workspace .card:nth-child(1) { animation-delay: 0.15s; }
+.workspace .card:nth-child(2) { animation-delay: 0.28s; }
+.workspace .card:nth-child(3) { animation-delay: 0.41s; }
 
-/* stagger cards */
-.main .card:nth-child(1) { animation-delay: 0.15s; }
-.main .card:nth-child(2) { animation-delay: 0.25s; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 4px 0 18px; }
 
-/* search highlight */
-.dash-val {
-  color: var(--ink3);
-  font-style: italic;
-}
-
-/* ═══════════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    RESPONSIVE
-═══════════════════════════════════════════════════ */
-@media (max-width: 620px) {
-  .topbar { padding: 0 16px; }
-  .hero   { padding: 40px 16px 24px; }
-  .main   { padding: 0 16px 48px; }
-  .card   { padding: 20px 18px; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .stats-grid .stat-card:nth-child(1) { grid-column: span 2; }
+══════════════════════════════════════════════ */
+@media (max-width: 600px) {
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .stats-row .stat-box:first-child { grid-column: span 2; }
   .export-row { flex-direction: column; }
-  .btn-export { min-width: unset; }
+  .card-head, .card-body { padding-left: 18px; padding-right: 18px; }
 }
 </style>
 </head>
 <body>
 
-<!-- ═════════════════════════════════════════════
-     CINEMATIC INTRO
-═════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════
+     INTRO
+══════════════════════════════════════════ -->
 <div id="intro">
-  <div class="intro-logo">ID<span>-RSS</span></div>
-  <div class="intro-sub">Intelligent Document Retrieval &amp; Structuring System</div>
-  <div class="intro-tagline">HackIndia 2026 · KCC Institute · Team ARISE</div>
+  <div class="intro-grid"></div>
+  <div class="intro-spotlight"></div>
+  <div class="intro-scan"></div>
 
-  <div class="intro-bar-wrap">
-    <div class="intro-bar-label">
-      <span>INITIALIZING SYSTEM</span>
-      <span id="intro-pct">0%</span>
+  <div class="intro-content">
+    <div class="intro-label">HackIndia 2026 &nbsp;·&nbsp; Team ARISE &nbsp;·&nbsp; KCC Institute</div>
+
+    <div class="intro-logo">
+      ID<span class="dash">-</span><span class="rss">RSS</span>
     </div>
-    <div class="intro-bar-track">
-      <div class="intro-bar-fill" id="intro-fill"></div>
-    </div>
-    <div class="intro-dots">
-      <div class="intro-dot"></div>
-      <div class="intro-dot"></div>
-      <div class="intro-dot"></div>
+
+    <div class="intro-tagline">Intelligent Document Retrieval &amp; Structuring System</div>
+
+    <div class="intro-loader">
+      <div class="intro-loader-meta">
+        <span>INITIALIZING</span>
+        <span id="intro-pct">0%</span>
+      </div>
+      <div class="intro-track">
+        <div class="intro-fill" id="intro-fill"></div>
+      </div>
+      <div class="intro-steps">
+        <div class="intro-step-dot"></div>
+        <div class="intro-step-dot"></div>
+        <div class="intro-step-dot"></div>
+      </div>
     </div>
   </div>
 
-  <div class="intro-badge">PYTHON · FLASK · OPENPYXL · REGEX</div>
+  <div class="intro-footer">PYTHON · FLASK · OPENPYXL · REGEX · JSZIP · XLSX.JS</div>
 </div>
 
-<!-- ═════════════════════════════════════════════
-     MAIN APP
-═════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════
+     APP
+══════════════════════════════════════════ -->
 <div id="app">
 
-  <!-- TOPBAR -->
-  <nav class="topbar">
-    <div class="topbar-brand">
-      <div class="topbar-icon">📄</div>
-      <span class="topbar-name">ID<span>-RSS</span></span>
+  <!-- NAV -->
+  <nav class="nav">
+    <a href="#" class="nav-brand">
+      <div class="nav-gem">📄</div>
+      <span class="nav-wordmark">ID<em>-RSS</em></span>
+    </a>
+    <div class="nav-right">
+      <span class="nav-chip">v1.0 · 2026</span>
+      <a class="nav-github" href="https://github.com/Ayushh-Sharmaa/ID-RSS-fixed" target="_blank">
+        ⭐ GitHub
+      </a>
     </div>
-    <span class="topbar-badge">v1.0.0 · HackIndia 2026</span>
   </nav>
 
   <!-- HERO -->
   <section class="hero">
-    <div class="hero-eyebrow">Document Intelligence</div>
-    <h1 class="hero-title">Extract. Structure.<br><em>Export.</em></h1>
-    <p class="hero-desc">
-      Point to a folder of <code style="font-family:'JetBrains Mono',monospace;font-size:0.9em;background:var(--surface2);padding:1px 6px;border-radius:4px;">.docx</code> files,
-      name the fields you need, and watch the data materialize — row by row — then export with one click.
+    <div class="hero-kicker">Document Intelligence</div>
+    <h1 class="hero-h1">
+      Drop files.<br>
+      Name your fields.<br>
+      <span class="italic">Watch data appear.</span>
+    </h1>
+    <p class="hero-p">
+      Upload any number of <code style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:0.88em;">.docx</code> admission files,
+      type the field names you want to pull out, and ID-RSS extracts them instantly —
+      right here in your browser. No server needed.
     </p>
-    <div class="hero-pills">
-      <span class="pill">python-docx</span>
-      <span class="pill">openpyxl</span>
-      <span class="pill">Flask</span>
-      <span class="pill">regex</span>
-      <span class="pill">30 demo files</span>
+    <div class="hero-tags">
+      <span class="htag">browser-native</span>
+      <span class="htag">zero install</span>
+      <span class="htag">python-docx</span>
+      <span class="htag">openpyxl</span>
+      <span class="htag">Flask backend</span>
+      <span class="htag">regex extraction</span>
     </div>
   </section>
 
-  <!-- MAIN -->
-  <main class="main">
-
-    <!-- CARD 1: Folder path -->
-    <div class="card" id="card-folder">
-      <div class="card-header">
-        <div class="card-step" id="step1">1</div>
-        <h2 class="card-title">Choose Document Folder</h2>
+  <!-- NOTICE -->
+  <div class="mode-banner">
+    <div class="mode-banner-inner">
+      <span>🌐</span>
+      <div>
+        <strong>GitHub Pages Preview Mode.</strong> This page runs entirely in your browser using JS.
+        For the full Python/Flask experience with 30 demo files, clone the repo and run <code style="font-family:'JetBrains Mono',monospace;background:rgba(26,107,82,0.12);padding:1px 6px;border-radius:3px;font-size:0.85em;">python App.py</code>.
+        Upload your own <code style="font-family:'JetBrains Mono',monospace;background:rgba(26,107,82,0.12);padding:1px 6px;border-radius:3px;font-size:0.85em;">.docx</code> files below to try it live.
       </div>
-      <label class="field-label" for="folderPath">Folder path</label>
-      <input type="text" id="folderPath"
-             placeholder="demo_files  or  C:\full\path\to\folder"
-             value="demo_files"
-             autocomplete="off">
-      <p style="font-size:0.78rem;color:var(--ink3);margin-top:8px;">
-        Type <code style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:3px;">demo_files</code> for the included 30-file demo set.
-      </p>
+    </div>
+  </div>
+
+  <!-- WORKSPACE -->
+  <main class="workspace">
+
+    <!-- STEP 1: Upload files -->
+    <div class="card" id="card1">
+      <div class="card-head">
+        <div class="step-num" id="s1">1</div>
+        <h2 class="card-title">Upload .docx Files</h2>
+      </div>
+      <div class="card-body">
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" multiple accept=".docx">
+          <div class="drop-icon">📂</div>
+          <div class="drop-title">Drop files here or click to browse</div>
+          <div class="drop-sub">
+            Accepts <code>.docx</code> files &nbsp;·&nbsp;
+            Fields must follow <code>Label- Value</code> format &nbsp;·&nbsp;
+            Multiple files supported
+          </div>
+        </div>
+        <div class="file-list" id="fileList"></div>
+      </div>
     </div>
 
-    <!-- CARD 2: Fields -->
-    <div class="card" id="card-fields">
-      <div class="card-header">
-        <div class="card-step" id="step2">2</div>
+    <!-- STEP 2: Fields -->
+    <div class="card" id="card2">
+      <div class="card-head">
+        <div class="step-num" id="s2">2</div>
         <h2 class="card-title">Add Fields to Extract</h2>
       </div>
-      <div class="fields-input-row">
-        <input type="text" id="fieldInput"
-               placeholder="e.g.  Name  or  Serial No."
-               autocomplete="off">
-        <button class="btn-add-field" onclick="addField()">+ Add</button>
+      <div class="card-body">
+        <div class="field-add-row">
+          <input type="text" id="fieldInp" placeholder="e.g.  Name   or   Serial No." autocomplete="off">
+          <button class="btn-add" onclick="addField()">+ Add</button>
+        </div>
+        <div class="chips-wrap" id="chipsWrap"></div>
+        <p style="font-size:0.77rem;color:var(--ink4);margin-top:10px;">
+          In your <code style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:3px;">.docx</code>, each field must appear as:
+          <code style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:3px;">Name- Tanishk Bansal</code>
+        </p>
       </div>
-      <div class="chips" id="chips">
-        <!-- default chips pre-loaded -->
-      </div>
-      <p style="font-size:0.78rem;color:var(--ink3);margin-top:10px;">
-        Labels in your .docx must follow the pattern: <code style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 5px;border-radius:3px;">Label- Value</code>
-      </p>
     </div>
 
-    <!-- Extract button + progress -->
-    <div class="card" style="padding:24px 32px;">
-      <button class="btn-primary" id="extractBtn" onclick="startExtract()">
-        <span id="btn-icon">⚡</span>
-        <span id="btn-text">Extract Data from All Files</span>
-      </button>
-      <div class="progress-wrap" id="progressWrap">
-        <div class="progress-info">
-          <span id="progress-label">Processing…</span>
-          <strong id="progress-count">0 / 0</strong>
+    <!-- EXTRACT BUTTON -->
+    <div class="card" style="animation-delay:0.54s;">
+      <div class="card-body" style="padding-top:20px;padding-bottom:20px;">
+        <button class="btn-primary" id="extractBtn" onclick="runExtract()">
+          <span id="btnIcon">⚡</span>
+          <span id="btnText">Extract Data from All Files</span>
+        </button>
+        <div class="prog-wrap" id="progWrap">
+          <div class="prog-row">
+            <span id="progLabel">Processing…</span>
+            <strong id="progCount">0 / 0</strong>
+          </div>
+          <div class="prog-track">
+            <div class="prog-fill" id="progFill"></div>
+          </div>
+          <div class="prog-log" id="progLog"></div>
         </div>
-        <div class="progress-track">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
-        <div class="progress-log" id="progressLog"></div>
       </div>
     </div>
 
     <!-- RESULTS -->
-    <div id="results-section">
+    <div id="resultsSec" style="display:none; animation: fadeUp 0.7s var(--ease) both;">
 
-      <!-- Stat cards -->
-      <div class="stats-grid" id="statsGrid">
-        <div class="stat-card" id="sc-total">
-          <div class="stat-value" id="sv-total">—</div>
-          <div class="stat-label">Total Files</div>
+      <!-- Stat boxes -->
+      <div class="stats-row" id="statsRow" style="margin-bottom:16px;">
+        <div class="stat-box" style="animation-delay:0.05s">
+          <div class="stat-val" id="sv0">—</div>
+          <div class="stat-lbl">Total Files</div>
         </div>
-        <div class="stat-card" id="sc-full">
-          <div class="stat-value" id="sv-full">—</div>
-          <div class="stat-label">Fully Extracted</div>
+        <div class="stat-box" style="animation-delay:0.12s">
+          <div class="stat-val" id="sv1">—</div>
+          <div class="stat-lbl">Fully Extracted</div>
         </div>
-        <div class="stat-card" id="sc-partial">
-          <div class="stat-value" id="sv-partial">—</div>
-          <div class="stat-label">Partial / Failed</div>
+        <div class="stat-box" style="animation-delay:0.19s">
+          <div class="stat-val" id="sv2">—</div>
+          <div class="stat-lbl">Partial / Failed</div>
         </div>
       </div>
 
       <!-- Table card -->
-      <div class="card" style="padding:0; overflow:hidden;">
-        <div style="padding:20px 24px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div class="card-step done">✓</div>
-            <h2 class="card-title" style="margin:0;">Extraction Results</h2>
+      <div class="card" style="animation-delay:0.3s; padding:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 28px 14px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="step-num done" id="s3"></div>
+            <h2 class="card-title">Extraction Results</h2>
           </div>
-          <span id="result-count" style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--ink3);"></span>
+          <span id="resultMeta" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ink4);"></span>
         </div>
-        <div class="table-wrap">
+
+        <div class="tbl-outer">
           <table>
-            <thead><tr id="thead-row"></tr></thead>
-            <tbody id="tbody"></tbody>
+            <thead><tr id="tHead"></tr></thead>
+            <tbody id="tBody"></tbody>
           </table>
         </div>
 
-        <div style="padding:20px 24px;">
-          <div class="export-row">
-            <button class="btn-export btn-excel" onclick="downloadExcel()">
-              <span>📊</span> Download Excel
-            </button>
-            <button class="btn-export btn-sheets" onclick="openSheets()">
-              <span>📋</span> Open Google Sheets
-            </button>
-          </div>
+        <div class="export-row">
+          <button class="btn-exp btn-excel" onclick="exportExcel()">
+            📊 Download Excel
+          </button>
+          <button class="btn-exp btn-gsheets" onclick="openSheets()">
+            📋 Open Google Sheets
+          </button>
         </div>
       </div>
 
     </div>
-    <!-- /results-section -->
+    <!-- /results -->
 
   </main>
 
   <footer>
-    Built with ❤️ by <span>Team ARISE</span> &nbsp;·&nbsp; HackIndia 2026 &nbsp;·&nbsp; KCC Institute
+    Built with ♥ by <a href="https://github.com/Ayushh-Sharmaa/ID-RSS-fixed" target="_blank">Team ARISE</a>
+    &nbsp;·&nbsp; HackIndia 2026 &nbsp;·&nbsp; KCC Institute
+    &nbsp;·&nbsp; <a href="https://github.com/Ayushh-Sharmaa/ID-RSS-fixed" target="_blank">View Source</a>
   </footer>
-</div>
 
-<!-- ERROR TOAST -->
+</div><!-- /#app -->
+
 <div class="toast" id="toast"></div>
 
-<!-- ═════════════════════════════════════════════
+<!-- ══════════════════════════════════════════
      JAVASCRIPT
-═════════════════════════════════════════════ -->
+══════════════════════════════════════════ -->
 <script>
-/* ── STATE ─────────────────────────────────── */
-let fields        = ["Name", "Serial No."];
-let extractedData = [];
+/* ── STATE ─────────────────────────── */
+let uploadedFiles  = [];
+let fields         = ['Name', 'Serial No.'];
+let extractedData  = [];
 let extractedFields = [];
 
-/* ── INTRO ANIMATION ───────────────────────── */
+/* ── INTRO ─────────────────────────── */
 window.addEventListener('DOMContentLoaded', () => {
-
-  // Animate percentage counter
-  const pctEl  = document.getElementById('intro-pct');
-  const fillEl = document.getElementById('intro-fill');
+  // Percentage ticker
   let pct = 0;
-  const ticker = setInterval(() => {
-    pct = Math.min(100, pct + Math.random() * 8 + 2);
+  const pctEl = document.getElementById('intro-pct');
+  const tick = setInterval(() => {
+    pct = Math.min(100, pct + (Math.random() * 9 + 2));
     pctEl.textContent = Math.floor(pct) + '%';
-    if (pct >= 100) clearInterval(ticker);
-  }, 120);
+    if (pct >= 100) clearInterval(tick);
+  }, 110);
 
-  // After 3.4s dismiss intro, show app
+  // Dismiss after 3.6s
   setTimeout(() => {
     document.getElementById('intro').classList.add('exit');
     setTimeout(() => {
       document.getElementById('intro').style.display = 'none';
-      const app = document.getElementById('app');
-      app.classList.add('visible');
-    }, 900);
-  }, 3400);
+      document.getElementById('app').classList.add('visible');
+    }, 1000);
+  }, 3600);
 
-  // Render default chips
   renderChips();
 
-  // Enter key in field input
-  document.getElementById('fieldInput').addEventListener('keydown', e => {
+  // Enter key on field input
+  document.getElementById('fieldInp').addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); addField(); }
+  });
+
+  // File input change
+  document.getElementById('fileInput').addEventListener('change', e => {
+    handleFiles(Array.from(e.target.files));
+  });
+
+  // Drag and drop
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    handleFiles(Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.docx')));
   });
 });
 
-/* ── CHIPS ─────────────────────────────────── */
+/* ── FILE HANDLING ─────────────────── */
+function handleFiles(files) {
+  const newFiles = files.filter(f => f.name.endsWith('.docx'));
+  if (!newFiles.length) { showToast('Please select .docx files only'); return; }
+  uploadedFiles = [...uploadedFiles, ...newFiles];
+  renderFileList();
+  markStep('s1');
+}
+
+function renderFileList() {
+  const list = document.getElementById('fileList');
+  if (!uploadedFiles.length) { list.innerHTML = ''; return; }
+  list.innerHTML = uploadedFiles.map((f, i) => `
+    <div class="file-item">
+      <span class="fi-icon">📄</span>
+      <span class="fi-name">${esc(f.name)}</span>
+      <span class="fi-size">${(f.size / 1024).toFixed(1)} KB</span>
+      <button onclick="removeFile(${i})" style="background:none;border:none;cursor:pointer;color:var(--ink4);font-size:1rem;line-height:1;padding:0 2px;transition:color 0.2s;" onmouseover="this.style.color='var(--rose)'" onmouseout="this.style.color='var(--ink4)'">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeFile(i) {
+  uploadedFiles.splice(i, 1);
+  renderFileList();
+}
+
+/* ── FIELD CHIPS ───────────────────── */
 function renderChips() {
-  const wrap = document.getElementById('chips');
-  if (fields.length === 0) {
-    wrap.innerHTML = '<span class="chip-empty">No fields yet — add one above</span>';
+  const wrap = document.getElementById('chipsWrap');
+  if (!fields.length) {
+    wrap.innerHTML = '<span class="chips-empty">No fields yet — add one above</span>';
     return;
   }
   wrap.innerHTML = fields.map((f, i) => `
     <span class="chip">
-      ${escapeHtml(f)}
-      <button class="chip-remove" onclick="removeField(${i})" title="Remove">✕</button>
+      ${esc(f)}
+      <button class="chip-x" onclick="removeField(${i})">✕</button>
     </span>
   `).join('');
 }
 
 function addField() {
-  const input = document.getElementById('fieldInput');
-  const val   = input.value.trim();
-  if (!val) { flashInput(input); return; }
-  if (fields.includes(val)) { showToast('Field "' + val + '" already added'); return; }
+  const inp = document.getElementById('fieldInp');
+  const val = inp.value.trim();
+  if (!val) { flashRed(inp); return; }
+  if (fields.includes(val)) { showToast(`"${val}" already added`); return; }
   fields.push(val);
   renderChips();
-  input.value = '';
-  input.focus();
-  markStep(2, true);
+  inp.value = ''; inp.focus();
+  markStep('s2');
 }
 
 function removeField(i) {
@@ -1160,181 +1231,221 @@ function removeField(i) {
   renderChips();
 }
 
-function flashInput(el) {
-  el.style.borderColor = 'var(--red)';
-  el.style.boxShadow   = '0 0 0 4px rgba(192,57,43,0.15)';
-  setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 1000);
-}
-
-/* ── EXTRACT ───────────────────────────────── */
-async function startExtract() {
-  const folderPath = document.getElementById('folderPath').value.trim();
-
-  if (!folderPath)       { showToast('Please enter a folder path'); return; }
-  if (fields.length === 0) { showToast('Add at least one field to extract'); return; }
+/* ── EXTRACT (browser-side via JSZip) ── */
+async function runExtract() {
+  if (!uploadedFiles.length) { showToast('Upload at least one .docx file first'); return; }
+  if (!fields.length)        { showToast('Add at least one field to extract'); return; }
 
   extractedFields = [...fields];
-  const btn  = document.getElementById('extractBtn');
+  const btn = document.getElementById('extractBtn');
   btn.disabled = true;
-  document.getElementById('btn-text').textContent = 'Extracting…';
-  document.getElementById('btn-icon').textContent = '⏳';
+  document.getElementById('btnText').textContent = 'Extracting…';
+  document.getElementById('btnIcon').textContent = '⏳';
 
-  const pwrap = document.getElementById('progressWrap');
-  pwrap.classList.add('show');
-  setProgress(0, 0, 0);
+  const pw = document.getElementById('progWrap');
+  pw.classList.add('show');
+  setProgress(0, uploadedFiles.length, 0);
 
-  document.getElementById('results-section').classList.remove('show');
+  document.getElementById('resultsSec').style.display = 'none';
+  extractedData = [];
 
-  try {
-    const res = await fetch('/extract', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folder_path: folderPath, fields: extractedFields })
-    });
+  for (let i = 0; i < uploadedFiles.length; i++) {
+    const file = uploadedFiles[i];
+    setProgress(i, uploadedFiles.length, (i / uploadedFiles.length) * 100);
+    logProgress(file.name);
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Extraction failed');
+    try {
+      const text = await readDocxText(file);
+      const row  = { file: file.name };
+      let found  = 0;
+      for (const f of extractedFields) {
+        const val = extractField(text, f);
+        row[f] = val;
+        if (val !== '—') found++;
+      }
+      row.confidence = extractedFields.length ? found / extractedFields.length : 0;
+      extractedData.push(row);
+    } catch (err) {
+      const row = { file: file.name, confidence: 0 };
+      extractedFields.forEach(f => row[f] = '—');
+      extractedData.push(row);
     }
 
-    const data = await res.json();
-    if (!data.length) { throw new Error('No .docx files found in that folder'); }
-
-    extractedData = data;
-    await animateResults(data, extractedFields);
-
-  } catch (err) {
-    showToast(err.message);
-  } finally {
-    btn.disabled = false;
-    document.getElementById('btn-text').textContent = 'Extract Data from All Files';
-    document.getElementById('btn-icon').textContent = '⚡';
+    await delay(40); // breathing room for animation
   }
+
+  setProgress(uploadedFiles.length, uploadedFiles.length, 100);
+  logProgress('Extraction complete ✓');
+
+  await animateResults(extractedData, extractedFields);
+
+  btn.disabled = false;
+  document.getElementById('btnText').textContent = 'Extract Data from All Files';
+  document.getElementById('btnIcon').textContent = '⚡';
 }
 
-/* ── ANIMATE RESULTS ROW BY ROW ──────────── */
-async function animateResults(data, fields) {
-  const section = document.getElementById('results-section');
-  section.classList.add('show');
+/* ── READ DOCX TEXT (JSZip) ─────────── */
+async function readDocxText(file) {
+  const ab  = await file.arrayBuffer();
+  const zip = await JSZip.loadAsync(ab);
+  const xml = await zip.file('word/document.xml').async('string');
+  // Strip XML tags, collapse whitespace, join with newlines for regex
+  const clean = xml
+    .replace(/<w:br[^/]*/g, '\n')
+    .replace(/<w:p[ >]/g, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+  return clean;
+}
 
-  // Build header
-  const thead = document.getElementById('thead-row');
-  thead.innerHTML = '<th>#</th><th>File</th>'
-    + fields.map(f => `<th>${escapeHtml(f)}</th>`).join('')
-    + '<th>Confidence</th>';
+/* ── REGEX EXTRACTION ──────────────── */
+function extractField(text, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(escaped + '\\s*-\\s*(.+?)(?:\\r?\\n|$)', 'i');
+  const m = text.match(pattern);
+  return m ? m[1].trim() : '—';
+}
 
-  // Clear tbody
-  const tbody = document.getElementById('tbody');
+/* ── ANIMATE RESULTS ───────────────── */
+async function animateResults(data, flds) {
+  const sec = document.getElementById('resultsSec');
+  sec.style.display = 'block';
+  sec.style.animation = 'fadeUp 0.7s var(--ease) both';
+
+  // Header
+  document.getElementById('tHead').innerHTML =
+    '<th>#</th><th>File</th>' +
+    flds.map(f => `<th>${esc(f)}</th>`).join('') +
+    '<th>Confidence</th>';
+
+  const tbody = document.getElementById('tBody');
   tbody.innerHTML = '';
 
-  let full = 0, partial = 0, failed = 0;
-  const total = data.length;
+  let full = 0, partial = 0, fail = 0;
 
   for (let i = 0; i < data.length; i++) {
     const row  = data[i];
     const conf = parseFloat(row.confidence || 0);
-
     if (conf === 1.0) full++;
     else if (conf > 0) partial++;
-    else failed++;
+    else fail++;
 
-    // Progress update
-    setProgress(i + 1, total, ((i+1)/total)*100);
-    logProgress(row.file);
+    const bClass = conf === 1 ? 'badge-100' : conf > 0 ? 'badge-part' : 'badge-fail';
+    const bIcon  = conf === 1 ? '●' : conf > 0 ? '◑' : '○';
 
-    // Build row
     const tr = document.createElement('tr');
-    const confClass = conf === 1.0 ? 'conf-100' : conf > 0 ? 'conf-part' : 'conf-0';
-    const confIcon  = conf === 1.0 ? '●' : conf > 0 ? '◑' : '○';
-
     tr.innerHTML = `
       <td>${i + 1}</td>
-      <td class="file-cell">${escapeHtml(row.file)}</td>
-      ${fields.map(f => {
+      <td class="td-file">${esc(row.file)}</td>
+      ${flds.map(f => {
         const v = row[f] || '—';
-        return `<td${v === '—' ? ' class="dash-val"' : ''}>${escapeHtml(v)}</td>`;
+        return `<td${v==='—'?' class="td-dash"':''}>${esc(v)}</td>`;
       }).join('')}
-      <td><span class="conf-badge ${confClass}">${confIcon} ${Math.round(conf * 100)}%</span></td>
+      <td><span class="badge ${bClass}">${bIcon} ${Math.round(conf * 100)}%</span></td>
     `;
     tbody.appendChild(tr);
+    await delay(35);
+    tr.classList.add('row-in');
 
-    // Stagger reveal
-    await delay(30);
-    tr.classList.add('row-visible');
-
-    // Update stat cards live
-    document.getElementById('sv-total').textContent   = i + 1;
-    document.getElementById('sv-full').textContent    = full;
-    document.getElementById('sv-partial').textContent = partial + failed;
+    // Live stat update
+    document.getElementById('sv0').textContent = i + 1;
+    document.getElementById('sv1').textContent = full;
+    document.getElementById('sv2').textContent = partial + fail;
   }
 
-  // Trigger stat card bar animations
-  document.querySelectorAll('.stat-card').forEach(c => c.classList.add('loaded'));
-  document.getElementById('result-count').textContent = `${total} records`;
-
-  // Done
-  setProgress(total, total, 100);
-  logProgress('Extraction complete ✓');
+  // Trigger bar animations
+  document.querySelectorAll('.stat-box').forEach(b => b.classList.add('anim'));
+  document.getElementById('resultMeta').textContent = `${data.length} records`;
 }
 
-/* ── PROGRESS HELPERS ─────────────────────── */
-function setProgress(current, total, pct) {
-  document.getElementById('progressFill').style.width  = pct + '%';
-  document.getElementById('progress-count').textContent = `${current} / ${total}`;
-  document.getElementById('progress-label').textContent =
-    pct < 100 ? 'Processing files…' : 'Done ✓';
+/* ── PROGRESS HELPERS ──────────────── */
+function setProgress(cur, tot, pct) {
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progCount').textContent = `${cur} / ${tot}`;
+  document.getElementById('progLabel').textContent = pct < 100 ? 'Processing files…' : 'Done ✓';
 }
-
 function logProgress(msg) {
-  const el = document.getElementById('progressLog');
-  el.innerHTML = `<span>${escapeHtml(msg)}</span>`;
+  document.getElementById('progLog').innerHTML = `<span>${esc(msg)}</span>`;
 }
 
-/* ── EXPORT ───────────────────────────────── */
-async function downloadExcel() {
+/* ── EXPORT EXCEL (SheetJS) ────────── */
+function exportExcel() {
   if (!extractedData.length) { showToast('Nothing to export yet'); return; }
-  try {
-    const res = await fetch('/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: extractedData, fields: extractedFields })
-    });
-    if (!res.ok) throw new Error('Export failed');
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'extracted_data.xlsx';
-    document.body.appendChild(a); a.click();
-    URL.revokeObjectURL(url); a.remove();
-  } catch (err) { showToast('Export failed: ' + err.message); }
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1 — Data
+  const headers = ['#', 'File', ...extractedFields, 'Confidence', 'Status'];
+  const rows = extractedData.map((r, i) => {
+    const conf = parseFloat(r.confidence || 0);
+    const row  = [i + 1, r.file];
+    extractedFields.forEach(f => row.push(r[f] || '—'));
+    row.push(Math.round(conf * 100) + '%');
+    row.push(conf === 1 ? 'Complete' : conf > 0 ? 'Partial' : 'Failed');
+    return row;
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  // Column widths
+  const colW = [{ wch: 5 }, { wch: 28 }, ...extractedFields.map(f => ({ wch: Math.max(f.length + 4, 18) })), { wch: 14 }, { wch: 12 }];
+  ws['!cols'] = colW;
+  XLSX.utils.book_append_sheet(wb, ws, 'Extracted Data');
+
+  // Sheet 2 — Summary
+  const total    = extractedData.length;
+  const fullCnt  = extractedData.filter(r => r.confidence === 1).length;
+  const partCnt  = extractedData.filter(r => r.confidence > 0 && r.confidence < 1).length;
+  const failCnt  = extractedData.filter(r => r.confidence === 0).length;
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ['ID-RSS — Extraction Summary'],
+    [],
+    ['Generated on',  new Date().toLocaleString()],
+    ['Generated by',  'ID-RSS — HackIndia 2026, KCC Institute'],
+    ['GitHub',        'https://github.com/Ayushh-Sharmaa/ID-RSS-fixed'],
+    [],
+    ['STATISTICS'],
+    ['Total files',    total],
+    ['Fields',         extractedFields.join(', ')],
+    [],
+    ['Fully extracted', fullCnt + ` (${Math.round(fullCnt/total*100)||0}%)`],
+    ['Partial',         partCnt + ` (${Math.round(partCnt/total*100)||0}%)`],
+    ['Failed',          failCnt + ` (${Math.round(failCnt/total*100)||0}%)`],
+  ]);
+  ws2['!cols'] = [{ wch: 26 }, { wch: 36 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  XLSX.writeFile(wb, 'ID-RSS_extracted.xlsx');
 }
 
 function openSheets() {
   if (!extractedData.length) { showToast('Extract data first'); return; }
-  downloadExcel();
-  setTimeout(() => window.open('https://sheets.new', '_blank'), 800);
+  exportExcel();
+  setTimeout(() => window.open('https://sheets.new', '_blank'), 900);
 }
 
-/* ── TOAST ────────────────────────────────── */
+/* ── HELPERS ───────────────────────── */
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = '⚠ ' + msg;
+  t.textContent = '⚠  ' + msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 4000);
 }
-
-/* ── STEP MARKERS ─────────────────────────── */
-function markStep(n, done) {
-  const el = document.getElementById('step' + n);
-  if (el) el.classList.toggle('done', done);
+function markStep(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('done');
 }
-
-/* ── UTILS ────────────────────────────────── */
-function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function escapeHtml(s) {
-  if (s == null) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function flashRed(el) {
+  el.style.borderColor = 'var(--rose)';
+  el.style.boxShadow   = '0 0 0 4px rgba(192,57,43,0.14)';
+  setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 900);
 }
 </script>
 
